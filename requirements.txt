@@ -1,0 +1,5 @@
+docker
+gevent
+Flask 
+flask_socketio 
+gunicorn
