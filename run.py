@@ -12,9 +12,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, async_mode=async_mode)
 
-docker_client = docker.DockerClient(base_url='unix://var/run/docker.sock', version='1.35',timeout=10)
-
-
 
 def isActive(sock):
 	try:
@@ -29,7 +26,8 @@ def background_thread(sock,room):
 	try:
 		while True:
 			resp = sock.recv(1024)
-			# print('recv:'+resp)
+			print(resp),
+			#save logs to sb
 			if resp:
 				socketio.send({'data': resp},room=room,namespace='/echo')
 			else:
@@ -48,13 +46,17 @@ def background_thread(sock,room):
 thread_lock = Lock()
 def create_exec(room):
 	with thread_lock:
-		try:
-			container=docker_client.containers.get(room)
+		#ip=getHostIpByRoom(room)
+		docker_client = docker.DockerClient(base_url='unix://var/run/docker.sock', version='1.35',timeout=10)
+		containers=docker_client.containers.list(filters={"name":room},all=True)
+		if(len(containers)>0):
+			container=containers[0]
 			if(container.status != 'running'):
-				container.restart
-		except:
+				container.restart()
+		else:
 			container = docker_client.containers.run(image='python:2', command="/bin/bash", 
-				name=room,remove=False, detach=True,stdin_open=True, tty=True)
+			name=room,remove=False, detach=True,stdin_open=True, tty=True)
+		
 
 	print('start thread:'+room)
 	command = ["/bin/sh","-c",'TERM=xterm-256color; export TERM; [ -x /bin/bash ] && ([ -x /usr/bin/script ] && /usr/bin/script -q -c "/bin/bash" /dev/null || exec /bin/bash) || exec /bin/sh']

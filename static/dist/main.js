@@ -36,10 +36,8 @@ function createTerminal() {
 
   var initialGeometry = term.proposeGeometry(),
       cols = 80,
-      rows = 24;
-  console.log("connect1");     
+      rows = 24;  
   sock = io.connect('http://localhost:5000/echo');
-  console.log("connect2");
   sock.on('connect', runRealTerminal);
   sock.on('disconnect', runFakeTerminal);
   // sock.on('message', function (e) {
@@ -60,6 +58,7 @@ function createTerminal() {
 }
 
 function runRealTerminal() {
+  //join room
   sock.emit('join', {room: '001',username:'liubiao'});
   term.attach(sock);
   term._initialized = true;
