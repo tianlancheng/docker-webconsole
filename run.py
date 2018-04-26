@@ -4,44 +4,39 @@ from flask_socketio import SocketIO, emit,send
 from flask_socketio import join_room, leave_room
 import docker
 from threading import Lock
+
 # Set this variable to "threading", "eventlet" or "gevent" to test the
 # different async modes, or leave it set to None for the application to choose
 # the best option based on installed packages.
-async_mode='gevent'
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, async_mode=async_mode)
-
-
-def isActive(sock):
-	try:
-		sock.getpeername()
-		return True
-	except:
-		return False
-
+socketio = SocketIO(app, async_mode='gevent')
 
 def background_thread(sock,room):
-	"""Example of how to send server generated events to clients."""
+	"""Example of how to send server generated events to clients."""	
 	try:
 		while True:
 			resp = sock.recv(1024)
-			print(resp),
+			# print(resp),
 			#save logs to sb
 			if resp:
-				socketio.send({'data': resp},room=room,namespace='/echo')
+				try:
+					socketio.send({'data': resp},room=room,namespace='/echo')
+				except:
+					pass
 			else:
-				print 'quit'
+				print('exit')
 				break;
-	except Exception,e:
-		print(e)
+	except Exception as e:
+			print(e)
 	finally:
-		print("close sock")
+		print('close sock')
 		try:
 			sock.send('exit\n')
 			sock.close()
 		except:
-			sock.close()
+			pass
 
 thread_lock = Lock()
 def create_exec(room):
@@ -54,12 +49,13 @@ def create_exec(room):
 			if(container.status != 'running'):
 				container.restart()
 		else:
-			container = docker_client.containers.run(image='python:2', command="/bin/bash", 
+			container = docker_client.containers.run(image='ubuntu:16.04', command="/bin/bash", 
 			name=room,remove=False, detach=True,stdin_open=True, tty=True)
 		
 
 	print('start thread:'+room)
 	command = ["/bin/sh","-c",'TERM=xterm-256color; export TERM; [ -x /bin/bash ] && ([ -x /usr/bin/script ] && /usr/bin/script -q -c "/bin/bash" /dev/null || exec /bin/bash) || exec /bin/sh']
+	
 	sock = container.exec_run(cmd=command,tty=True,stdin=True,detach=False,stream=False,socket=True).output
 	sock.settimeout(600)
 	oldsock=session.get('sock',None)
@@ -70,9 +66,10 @@ def create_exec(room):
 def close_sock():
 	sock=session.get('sock',None)
 	if(sock):
-		if(isActive(sock)):
+		try:
 			sock.send('exit\n')
-		sock.close
+		except:
+			pass
 
 @app.route('/')
 def index():
@@ -82,10 +79,10 @@ def index():
 def test_message(message):
 	# print("dddd:"+message)
 	sock=session.get('sock',None)
-	if(sock and isActive(sock)):
+	try:
 		sock.send(message)
-	else:
-		send({'data': 'disconnect to container'})
+	except:
+		send({'data': 'disconnect '})
 
 @socketio.on('connect', namespace='/echo')
 def test_connect():
@@ -99,7 +96,7 @@ def test_disconnect():
 
 @socketio.on('join', namespace='/echo')
 def on_join(data):
-	print(' entered the room:'+data['room'])
+	print('entered the room:'+data['room'])
 	room = data['room']
 	join_room(room)
 	session['username']=data.get('username',"unknown")
